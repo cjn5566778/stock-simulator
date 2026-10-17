@@ -1,0 +1,1410 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>📈 股票模拟器 · 财富人生</title>
+<style>
+:root{
+  --bg:#0a0e14; --panel:#141a23; --panel2:#1b222d; --border:#242e3c;
+  --text:#e6edf3; --muted:#8b98a9;
+  --green:#3fb950; --red:#f85149; --yellow:#f0b429; --blue:#58a6ff; --gold:#e3b341;
+}
+*{box-sizing:border-box; -webkit-tap-highlight-color:transparent;}
+body{
+  margin:0; padding:18px 14px 40px;
+  background:radial-gradient(1200px 600px at 50% -10%, #16202e 0%, var(--bg) 60%);
+  color:var(--text);
+  font-family:-apple-system,BlinkMacSystemFont,"PingFang SC","Microsoft YaHei",Segoe UI,sans-serif;
+  min-height:100vh;
+  transition:padding-top .3s;
+}
+body.has-banner{padding-top:60px;}
+.app{max-width:1180px; margin:0 auto; display:flex; flex-direction:column; gap:14px;}
+
+/* ---------- 破产警告横幅 ---------- */
+.bankrupt-banner{
+  position:fixed; top:0; left:0; right:0; z-index:150;
+  background:linear-gradient(180deg, #f85149, #b62324);
+  color:#fff; padding:11px 20px; text-align:center;
+  font-weight:700; font-size:13.5px; letter-spacing:.3px;
+  transform:translateY(-100%); transition:.3s;
+  box-shadow:0 4px 20px rgba(248,81,73,.45);
+}
+.bankrupt-banner.show{transform:translateY(0); animation:pulse 1.6s infinite;}
+@keyframes pulse{0%,100%{box-shadow:0 4px 20px rgba(248,81,73,.45);} 50%{box-shadow:0 4px 30px rgba(248,81,73,.8);}}
+
+/* ---------- 顶栏 ---------- */
+.topbar{
+  display:flex; flex-wrap:wrap; gap:16px; align-items:center; justify-content:space-between;
+  background:linear-gradient(180deg,#18202b,#131a23);
+  border:1px solid var(--border); border-radius:16px; padding:14px 20px;
+  box-shadow:0 10px 30px rgba(0,0,0,.35);
+}
+.brand{display:flex; align-items:center; gap:12px;}
+.logo{font-size:30px; filter:drop-shadow(0 0 10px rgba(88,166,255,.6));}
+.brand h1{margin:0; font-size:19px; letter-spacing:.5px;}
+.brand .sub{font-size:12px; color:var(--muted); margin-top:2px;}
+.stats{display:flex; gap:10px; flex-wrap:wrap;}
+.stat{
+  background:var(--panel2); border:1px solid var(--border); border-radius:11px;
+  padding:7px 14px; min-width:104px;
+}
+.stat span{display:block; font-size:11px; color:var(--muted); margin-bottom:3px;}
+.stat b{font-size:15px; font-variant-numeric:tabular-nums;}
+
+/* ---------- 布局 ---------- */
+.main{display:grid; grid-template-columns:1fr 1fr; gap:14px;}
+@media(max-width:880px){ .main{grid-template-columns:1fr;} }
+
+.panel{
+  background:var(--panel); border:1px solid var(--border); border-radius:16px;
+  padding:14px 16px; box-shadow:0 8px 24px rgba(0,0,0,.25);
+}
+.panel-head{display:flex; align-items:center; justify-content:space-between; gap:10px; margin-bottom:12px; flex-wrap:wrap;}
+.panel-head h2{margin:0; font-size:15px; letter-spacing:.5px; color:#c9d5e1;}
+
+/* ---------- 按钮 ---------- */
+.btn{
+  border:1px solid var(--border); background:var(--panel2); color:var(--text);
+  padding:8px 15px; border-radius:9px; cursor:pointer; font-size:13px; font-weight:600;
+  transition:.15s; font-family:inherit; white-space:nowrap;
+}
+.btn:hover{background:#232d3b; border-color:#33415a;}
+.btn:active{transform:scale(.97);}
+.btn:disabled{cursor:not-allowed; opacity:.4;}
+.btn:disabled:hover{background:var(--panel2); border-color:var(--border);}
+.btn.primary{background:linear-gradient(180deg,#2f81f7,#1f6feb); border-color:#1f6feb; color:#fff;}
+.btn.primary:hover{background:linear-gradient(180deg,#3b8bf8,#2274f0);}
+.btn.active{background:#f0b429; border-color:#f0b429; color:#1a1a1a;}
+.btn.ghost{color:var(--muted);}
+.btn.loan{background:linear-gradient(180deg,#c98a0a,#a86f00); border-color:#a86f00; color:#fff;}
+.btn.loan:hover{background:linear-gradient(180deg,#e09b12,#b87c00);}
+.btn.gold{background:linear-gradient(180deg,#d4a017,#b58810); border-color:#b58810; color:#1a1a1a;}
+.btn.gold:hover{background:linear-gradient(180deg,#e6b12a,#c4961b);}
+.controls{display:flex; gap:8px; flex-wrap:wrap;}
+
+/* ---------- 行情列表 ---------- */
+.stock-list{display:flex; flex-direction:column; gap:7px;}
+.stock-row{
+  display:flex; align-items:center; gap:11px; padding:9px 11px; border-radius:12px;
+  background:var(--panel2); border:1px solid transparent; cursor:pointer; transition:.15s;
+}
+.stock-row:hover{background:#212b38;}
+.stock-row.active{border-color:var(--blue); background:#1a2637; box-shadow:0 0 0 1px rgba(88,166,255,.35) inset;}
+.stock-row.delisted{opacity:.62;}
+.stock-row.delisted.active{border-color:var(--red); background:#1e1517; box-shadow:0 0 0 1px rgba(248,81,73,.35) inset;}
+.s-emoji{
+  width:38px; height:38px; border-radius:11px; display:grid; place-items:center;
+  font-size:19px; flex:0 0 auto;
+}
+.s-info{flex:1 1 auto; min-width:0;}
+.s-name{font-size:13.5px; font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
+.s-code{font-size:11px; color:var(--muted); margin-top:2px;}
+.spark{width:76px; height:30px; flex:0 0 auto;}
+.s-price{text-align:right; flex:0 0 auto; min-width:88px;}
+.s-price .p{font-size:14px; font-weight:700; font-variant-numeric:tabular-nums;}
+.s-price .chg{font-size:11.5px; font-weight:600; margin-top:2px;}
+.up{color:var(--green);} .down{color:var(--red);}
+
+/* ---------- 图表 ---------- */
+.big-chart{width:100%; height:230px; display:block; border-radius:10px; background:#101720;}
+.chart-price{font-size:19px; font-weight:800; font-variant-numeric:tabular-nums;}
+.chart-price.delisted{color:var(--red); font-size:16px;}
+
+/* ---------- 交易 ---------- */
+.trade{margin-top:14px; border-top:1px dashed var(--border); padding-top:13px; display:flex; flex-direction:column; gap:10px;}
+.trade-row{display:flex; align-items:center; gap:9px; flex-wrap:wrap;}
+.trade-row label{font-size:12.5px; color:var(--muted);}
+#qty{
+  flex:1 1 110px; min-width:90px; background:#0e151e; border:1px solid var(--border);
+  color:var(--text); border-radius:9px; padding:9px 12px; font-size:14px; font-family:inherit;
+  font-variant-numeric:tabular-nums; outline:none;
+}
+#qty:focus{border-color:var(--blue);}
+.btn.buy{background:linear-gradient(180deg,#2ea043,#238636); border-color:#238636; color:#fff;}
+.btn.buy:hover{background:linear-gradient(180deg,#35b34c,#279a3d);}
+.btn.sell{background:linear-gradient(180deg,#da3633,#b62324); border-color:#b62324; color:#fff;}
+.btn.sell:hover{background:linear-gradient(180deg,#e64545,#c42b2b);}
+.chip{
+  background:transparent; border:1px dashed var(--border); color:var(--muted);
+  font-size:11.5px; padding:6px 11px; border-radius:20px; cursor:pointer; font-family:inherit;
+  transition:.15s;
+}
+.chip:hover{color:var(--text); border-color:var(--blue);}
+.chip:disabled{cursor:not-allowed; opacity:.4;}
+.holding{
+  font-size:12.5px; color:var(--muted); background:#0e151e; border-radius:10px;
+  padding:10px 13px; line-height:1.6;
+}
+
+/* ---------- 个人资产 ---------- */
+.asset-box{margin-top:14px; border-top:1px dashed var(--border); padding-top:13px;}
+.asset-head{display:flex; justify-content:space-between; align-items:center; gap:10px; margin-bottom:10px; flex-wrap:wrap;}
+.asset-head>span{font-size:13px; color:#c9d5e1; font-weight:600;}
+.daily-flow{font-size:12px; color:var(--muted);}
+.daily-flow b{font-size:13px; font-variant-numeric:tabular-nums;}
+.asset-item{
+  display:flex; align-items:center; gap:11px; background:var(--panel2);
+  border:1px solid var(--border); border-radius:11px; padding:9px 12px; margin-bottom:7px;
+}
+.asset-item:last-child{margin-bottom:0;}
+.ai-icon{font-size:22px; flex:0 0 auto; width:30px; text-align:center;}
+.ai-info{flex:1 1 auto; min-width:0;}
+.ai-title{font-size:12.8px; font-weight:600;}
+.ai-desc{font-size:11.5px; color:var(--muted); margin-top:3px; line-height:1.5;}
+.ai-desc b{font-variant-numeric:tabular-nums;}
+
+/* ---------- 贷款 ---------- */
+.loan-box{margin-top:14px; border-top:1px dashed var(--border); padding-top:13px;}
+.loan-head{display:flex; justify-content:space-between; align-items:center; gap:10px; margin-bottom:10px; flex-wrap:wrap;}
+.loan-head span{font-size:13px; color:#c9d5e1; font-weight:600;}
+.loan-head .rate-tip{font-size:11px; color:var(--yellow); background:rgba(240,180,41,.10);
+  border:1px solid rgba(240,180,41,.25); padding:2px 8px; border-radius:20px; margin-left:6px;}
+.loan-list{display:flex; flex-direction:column; gap:7px; max-height:220px; overflow-y:auto; padding-right:4px;}
+.loan-list::-webkit-scrollbar{width:6px;}
+.loan-list::-webkit-scrollbar-thumb{background:#2b3746; border-radius:4px;}
+.loan-item{
+  display:flex; align-items:center; gap:10px;
+  background:#1d1710; border:1px solid #3d2e17; border-radius:10px;
+  padding:9px 12px; font-size:12.5px; flex-wrap:wrap;
+}
+.loan-item .li-amt{font-weight:700; color:var(--yellow); font-variant-numeric:tabular-nums; flex:0 0 auto;}
+.loan-item .li-due{color:var(--muted); flex:1 1 auto; line-height:1.5; min-width:160px;}
+.loan-item .li-due b{color:var(--text);}
+.loan-item .li-due b.urgent{color:var(--red);}
+.loan-item .li-due .int{color:var(--yellow);}
+.loan-item .btn{padding:5px 11px; font-size:11.5px; flex:0 0 auto;}
+.no-loan{font-size:12.5px; color:var(--muted); padding:8px 12px; background:#0e151e; border-radius:10px;}
+
+/* ---------- 日志 ---------- */
+.log-list{display:flex; flex-direction:column; gap:6px; max-height:230px; overflow-y:auto; padding-right:4px;}
+.log-list::-webkit-scrollbar{width:6px;}
+.log-list::-webkit-scrollbar-thumb{background:#2b3746; border-radius:4px;}
+.log-item{
+  display:flex; align-items:center; gap:10px; font-size:12.8px;
+  padding:8px 12px; border-radius:10px; background:var(--panel2); border-left:3px solid var(--border);
+  animation:slideIn .25s ease;
+}
+@keyframes slideIn{from{opacity:0; transform:translateY(-5px);} to{opacity:1; transform:none;}}
+.log-item.macro{border-left-color:var(--yellow); background:#221e14;}
+.log-item.good{border-left-color:var(--green);}
+.log-item.bad{border-left-color:var(--red);}
+.log-item.info{border-left-color:var(--blue);}
+.log-item.illegal{border-left-color:#ff2d55; background:#2a0d12;}
+.log-day{font-size:11px; color:var(--muted); flex:0 0 auto; font-variant-numeric:tabular-nums;}
+.log-text{flex:1 1 auto; line-height:1.45;}
+.log-impact{font-size:12px; font-weight:700; flex:0 0 auto; font-variant-numeric:tabular-nums;}
+.empty{color:var(--muted); font-size:12.5px; padding:14px; text-align:center;}
+
+/* ---------- 结算弹窗 ---------- */
+.overlay{
+  position:fixed; inset:0; background:rgba(5,8,12,.84);
+  display:none; place-items:center; z-index:200;
+  backdrop-filter:blur(5px); -webkit-backdrop-filter:blur(5px); padding:20px;
+}
+.overlay.show{display:grid;}
+.modal{
+  background:linear-gradient(180deg,#1b2431,#131a23);
+  border:1px solid #2f3d51; border-radius:20px; padding:26px 26px 22px;
+  max-width:430px; width:100%; text-align:center;
+  box-shadow:0 30px 90px rgba(0,0,0,.7);
+  animation:pop .32s cubic-bezier(.2,.9,.3,1.2);
+}
+@keyframes pop{from{transform:scale(.9); opacity:0;} to{transform:scale(1); opacity:1;}}
+.modal-icon{font-size:46px; line-height:1; margin-bottom:10px;}
+.modal h2{margin:0 0 6px; font-size:22px; letter-spacing:.5px;}
+.modal .sub{font-size:12.5px; color:var(--muted); margin-bottom:18px; line-height:1.5;}
+.modal .rows{display:flex; flex-direction:column; gap:7px; margin-bottom:20px; text-align:left;}
+.modal .row{
+  display:flex; justify-content:space-between; align-items:center; gap:12px;
+  font-size:13px; padding:9px 13px; background:#0e151e; border-radius:10px;
+}
+.modal .row span{color:var(--muted);}
+.modal .row b{font-variant-numeric:tabular-nums;}
+.modal .btn{width:100%; padding:11px; font-size:14px;}
+
+/* ---------- Toast ---------- */
+#toast{
+  position:fixed; left:50%; bottom:40px; transform:translateX(-50%) translateY(20px);
+  background:#233044; color:#fff; padding:11px 22px; border-radius:11px; font-size:13.5px;
+  opacity:0; pointer-events:none; transition:.28s; z-index:300; border:1px solid #33415a;
+  box-shadow:0 10px 30px rgba(0,0,0,.5); max-width:88vw; text-align:center;
+}
+#toast.show{opacity:1; transform:translateX(-50%) translateY(0);}
+</style>
+</head>
+<body>
+
+<div class="bankrupt-banner" id="bankruptBanner">
+  ⚠️ 现金为负！请变卖资产（卖车 / 卖房 / 卖股票）自救，否则将破产清算
+</div>
+
+<div class="app">
+
+  <header class="topbar">
+    <div class="brand">
+      <div class="logo">📈</div>
+      <div>
+        <h1>股票模拟器 · 财富人生</h1>
+        <div class="sub">本金 ¥1,000,000 · 工资 ¥300/天 · 日用 ¥400/天 · 贷款日息 0.1% · 违法直接退市</div>
+      </div>
+    </div>
+    <div class="stats">
+      <div class="stat"><span>交易日</span><b id="sDay">第 1 天</b></div>
+      <div class="stat"><span>现金</span><b id="sCash">¥1,000,000.00</b></div>
+      <div class="stat"><span>日净流入</span><b id="sFlow">-¥100.00</b></div>
+      <div class="stat"><span>负债(含息)</span><b id="sDebt">¥0.00</b></div>
+      <div class="stat"><span>净资产</span><b id="sNet">¥1,000,000.00</b></div>
+      <div class="stat"><span>总盈亏</span><b id="sPnl">0.00%</b></div>
+    </div>
+  </header>
+
+  <div class="main">
+    <!-- 左：行情 + 个人资产 -->
+    <section class="panel">
+      <div class="panel-head">
+        <h2>行情列表</h2>
+        <div class="controls">
+          <button class="btn primary" id="btnNext">下一日 ▸</button>
+          <button class="btn" id="btnAuto">自动播放</button>
+          <button class="btn gold" id="btnSettle">💰 见好就收</button>
+          <button class="btn ghost" id="btnReset">重置</button>
+        </div>
+      </div>
+      <div class="stock-list" id="stockList"></div>
+
+      <!-- 个人资产 -->
+      <div class="asset-box">
+        <div class="asset-head">
+          <span>💼 个人财务</span>
+          <span class="daily-flow">每日收支：工资 <b class="up">+¥300</b> · 日用 <b class="down" id="dailyCostTxt">-¥400</b></span>
+        </div>
+
+        <div class="asset-item">
+          <div class="ai-icon">🚗</div>
+          <div class="ai-info">
+            <div class="ai-title">私家车</div>
+            <div class="ai-desc" id="carDesc">—</div>
+          </div>
+          <button class="btn gold" id="btnCar">卖车</button>
+        </div>
+
+        <div class="asset-item">
+          <div class="ai-icon">🏠</div>
+          <div class="ai-info">
+            <div class="ai-title">房产</div>
+            <div class="ai-desc" id="houseDesc">—</div>
+          </div>
+          <button class="btn gold" id="btnHouse">卖房</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- 右：图表 + 交易 + 贷款 -->
+    <section class="panel">
+      <div class="panel-head">
+        <h2 id="chartTitle">—</h2>
+        <div class="chart-price" id="chartPrice">¥0.00</div>
+      </div>
+      <canvas class="big-chart" id="bigChart"></canvas>
+
+      <div class="trade">
+        <div class="trade-row">
+          <label>数量</label>
+          <input id="qty" type="number" min="1" step="1" value="100">
+          <button class="btn buy" id="btnBuy">买入</button>
+          <button class="btn sell" id="btnSell">卖出</button>
+        </div>
+        <div class="trade-row">
+          <button class="chip" id="btnMax">最大可买 <span id="maxBuy">0</span> 股</button>
+          <button class="chip" id="btnAll">全部卖出 <span id="allSell">0</span> 股</button>
+        </div>
+        <div class="holding" id="holding">暂无持仓</div>
+
+        <!-- 贷款区 -->
+        <div class="loan-box">
+          <div class="loan-head">
+            <span>🏦 银行贷款<span class="rate-tip">日息 0.1% · 30 天 · 最多 100 笔</span></span>
+            <button class="btn loan" id="btnLoan">借款 ¥500,000</button>
+          </div>
+          <div class="loan-list" id="loanList"></div>
+        </div>
+      </div>
+    </section>
+  </div>
+
+  <!-- 快讯 -->
+  <section class="panel">
+    <div class="panel-head"><h2>📰 市场快讯</h2></div>
+    <div class="log-list" id="logList"></div>
+  </section>
+
+</div>
+
+<!-- 结算弹窗 -->
+<div class="overlay" id="overlay">
+  <div class="modal">
+    <div class="modal-icon" id="endIcon">💥</div>
+    <h2 id="endTitle">破产清算</h2>
+    <div class="sub" id="endSub">—</div>
+    <div class="rows" id="endBody"></div>
+    <button class="btn primary" id="btnRestart">重新开始</button>
+  </div>
+</div>
+
+<div id="toast"></div>
+
+<script>
+/* =========================================================
+   工具
+   ========================================================= */
+const $ = id => document.getElementById(id);
+const clamp = (v,a,b) => Math.max(a, Math.min(b, v));
+const rand  = (a,b) => a + Math.random()*(b-a);
+const pick  = arr => arr[Math.floor(Math.random()*arr.length)];
+function randn(){
+  let u=0, v=0;
+  while(u===0) u=Math.random();
+  while(v===0) v=Math.random();
+  return Math.sqrt(-2*Math.log(u)) * Math.cos(2*Math.PI*v);
+}
+const money = n => (n < 0 ? '-¥' : '¥') +
+  Math.abs(n).toLocaleString('zh-CN',{minimumFractionDigits:2, maximumFractionDigits:2});
+function alpha(hex, a){
+  const n = parseInt(hex.slice(1),16);
+  return `rgba(${(n>>16)&255},${(n>>8)&255},${n&255},${a})`;
+}
+function showToast(msg){
+  const t = $('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  clearTimeout(t._timer);
+  t._timer = setTimeout(()=>t.classList.remove('show'), 2000);
+}
+
+/* =========================================================
+   全局参数
+   ========================================================= */
+const START_CASH = 1000000;      // 本金 100 万
+
+const WAGE      = 300;           // 每日工资
+const BASE_COST = 400;           // 基础日用开销
+
+const LOAN_AMOUNT     = 500000;  // 单笔贷款本金 50 万
+const LOAN_TERM       = 30;      // 30 天到期
+const MAX_LOANS       = 100;     // 最多 100 笔
+const LOAN_DAILY_RATE = 0.001;   // 日利率 0.1%
+
+const MIN_RATIO   = 0.55;        // 退市线：初始价 × 55%
+const REVIVE_DAYS = 30;          // 退市后 30 天复活
+const REVIVE_LOW  = 0.60;
+const REVIVE_HIGH = 0.90;
+
+const ILLEGAL_CHANCE = 0.01;     // 违法事件：每天 1% 概率，直接退市
+
+/* 车 / 房 */
+const CAR   = { name:'私家车', value:250000,  redeem:300000,  daily:100 };
+const HOUSE = { name:'房产',   value:3000000, redeem:4000000, daily:200 };
+
+/* =========================================================
+   股票数据
+   ========================================================= */
+const INIT = [
+  { name:'星辰科技', code:'600001', emoji:'🚀', color:'#58a6ff', price:88.40, vol:0.030, beta: 1.5 },
+  { name:'江南能源', code:'600002', emoji:'⚡', color:'#f0b429', price:42.15, vol:0.020, beta: 1.0 },
+  { name:'大商银行', code:'600003', emoji:'🏦', color:'#3fb950', price:15.80, vol:0.011, beta: 0.6 },
+  { name:'鲜果生鲜', code:'600004', emoji:'🍎', color:'#ff7b72', price:31.60, vol:0.024, beta: 0.9 },
+  { name:'黄金ETF', code:'518880', emoji:'🥇', color:'#d4a017', price:56.20, vol:0.013, beta:-0.7 },
+];
+
+const STOCK_EVENTS = [
+  { t:'🚀 {n} 新产品发布会引爆市场，订单量暴涨',        impact:[ 0.08, 0.22] },
+  { t:'💥 {n} 曝出财务造假丑闻，股价闪崩',              impact:[-0.30,-0.14] },
+  { t:'📊 {n} 季报大超预期，净利润同比增长 {p}%',        impact:[ 0.05, 0.14] },
+  { t:'📉 {n} 季报不及预期，管理层下调全年指引',        impact:[-0.15,-0.05] },
+  { t:'🤝 传 {n} 将被行业巨头溢价收购，资金抢筹',        impact:[ 0.10, 0.26] },
+  { t:'⚖️ {n} 遭监管调查，或面临巨额罚款',              impact:[-0.22,-0.09] },
+  { t:'💡 {n} 获得关键专利授权，技术壁垒大幅提升',      impact:[ 0.05, 0.16] },
+  { t:'🔥 {n} 主力工厂突发火灾，生产线全面停产',        impact:[-0.26,-0.11] },
+  { t:'🏆 {n} 中标政府大单，未来业绩确定性增强',        impact:[ 0.06, 0.19] },
+  { t:'🧊 {n} 核心高管集体离职，市场信心受挫',          impact:[-0.17,-0.06] },
+  { t:'🌍 {n} 海外市场拓展顺利，出口数据亮眼',          impact:[ 0.04, 0.15] },
+  { t:'🐻 {n} 大股东宣布减持套现，抛压沉重',            impact:[-0.16,-0.04] },
+  { t:'🔬 {n} 核心技术取得突破，机构集体上调评级',      impact:[ 0.07, 0.18] },
+  { t:'💸 {n} 被曝应收账款高企，现金流告急',            impact:[-0.19,-0.07] },
+];
+
+const MARKET_EVENTS = [
+  { t:'🏦 央行宣布降息 25 个基点，流动性全面宽松',      impact:[ 0.020, 0.055] },
+  { t:'📈 宏观数据全面向好，市场情绪高涨',              impact:[ 0.015, 0.048] },
+  { t:'🌪️ 全球经济衰退担忧加剧，避险情绪升温',          impact:[-0.060,-0.020] },
+  { t:'⚠️ 突发地缘政治冲突，市场恐慌抛售',              impact:[-0.085,-0.030] },
+  { t:'💵 外资大幅流入，北向资金创单日净买入新高',      impact:[ 0.012, 0.050] },
+  { t:'🩸 市场传出流动性危机，杠杆资金出现踩踏',        impact:[-0.095,-0.040] },
+  { t:'🎉 重磅政策利好落地，新一轮行情呼之欲出',        impact:[ 0.030, 0.080] },
+  { t:'😴 市场成交清淡，多空双方陷入僵持',              impact:[-0.008, 0.008] },
+];
+
+/* =========================================================
+   状态
+   ========================================================= */
+const state = {
+  day:1, cash:START_CASH, startCash:START_CASH, selected:0,
+  log:[], stocks:[], loans:[], loanSeq:0,
+  carSold:false, houseSold:false,
+  ended:false, endReason:null,
+  bankruptcyWarning:false
+};
+let autoTimer = null;
+
+function genHistory(price, vol){
+  const arr = new Array(31);
+  arr[30] = price;
+  for(let i=29; i>=0; i--) arr[i] = arr[i+1] / (1 + randn()*vol*0.8);
+  return arr;
+}
+
+function initState(){
+  state.day = 1;
+  state.cash = START_CASH;
+  state.startCash = START_CASH;
+  state.selected = 0;
+  state.log = [];
+  state.loans = [];
+  state.loanSeq = 0;
+  state.carSold = false;
+  state.houseSold = false;
+  state.ended = false;
+  state.endReason = null;
+  state.bankruptcyWarning = false;
+  state.stocks = INIT.map(s => ({
+    ...s,
+    origPrice: s.price,
+    minPrice: +(s.price * MIN_RATIO).toFixed(2),
+    shares: 0,
+    cost: 0,
+    drift: 0,
+    delisted: false,
+    reviveDay: 0,
+    history: genHistory(s.price, s.vol),
+  }));
+  addLog('info', `欢迎！本金 ${money(START_CASH)}。每日工资 ¥${WAGE}，日用开销 ¥${BASE_COST}。`, 0);
+  addLog('info', `贷款日息 ${(LOAN_DAILY_RATE*100).toFixed(1)}%，30 天到期还本付息，最多 ${MAX_LOANS} 笔。`, 0);
+  addLog('info', '股票跌破底价即退市；极小概率触发违法直接退市，30 天后复活。', 0);
+}
+
+function addLog(type, text, impact){
+  state.log.unshift({ day: state.day, type, text, impact: impact || 0 });
+  if(state.log.length > 80) state.log.pop();
+}
+
+/* =========================================================
+   贷款计算
+   ========================================================= */
+function loanDays(l){
+  return clamp(state.day - l.startDay, 0, LOAN_TERM);
+}
+function loanInterest(l){
+  return l.principal * l.rate * loanDays(l);
+}
+function loanTotal(l){
+  return l.principal + loanInterest(l);
+}
+function totalDebt(){
+  return state.loans.reduce((a,l) => a + loanTotal(l), 0);
+}
+function totalPrincipal(){
+  return state.loans.reduce((a,l) => a + l.principal, 0);
+}
+
+const holdingsValue = () => state.stocks.reduce((a,s) => a + s.price * s.shares, 0);
+
+function dailyNetFlow(){
+  let cost = BASE_COST;
+  if(state.carSold)   cost += CAR.daily;
+  if(state.houseSold) cost += HOUSE.daily;
+  return { wage: WAGE, cost, net: WAGE - cost };
+}
+
+/* =========================================================
+   破产判定
+   ========================================================= */
+/* 是否还有可变卖的资产（车 / 房 / 股票） */
+function hasLiquidatable(){
+  if(!state.carSold) return true;
+  if(!state.houseSold) return true;
+  return state.stocks.some(s => s.shares > 0);
+}
+
+/* =========================================================
+   退市 / 复活
+   ========================================================= */
+function delistStock(s, reason){
+  const lostShares = s.shares;
+  const lostCost   = s.cost;
+
+  s.price  = 0;
+  s.shares = 0;
+  s.cost   = 0;
+  s.drift  = 0;
+  s.delisted = true;
+  s.reviveDay = state.day + REVIVE_DAYS;
+
+  let msg;
+  if(reason === 'illegal'){
+    msg = `🚨 ${s.name} 因严重违法行为被强制退市，持股全部清零！`;
+  }else{
+    msg = `💀 ${s.name} 跌破底价 ¥${s.minPrice.toFixed(2)}，公司退市清零！`;
+  }
+  if(lostShares > 0){
+    msg += ` 持仓 ${lostShares} 股全部归零（成本 ${money(lostCost)}）。`;
+  }
+  msg += ` 将于第 ${s.reviveDay} 天重新上市。`;
+  addLog(reason === 'illegal' ? 'illegal' : 'bad', msg, 0);
+}
+
+function reviveStocks(){
+  state.stocks.forEach(s => {
+    if(!s.delisted || state.day < s.reviveDay) return;
+    s.delisted = false;
+    s.price    = +(s.origPrice * rand(REVIVE_LOW, REVIVE_HIGH)).toFixed(2);
+    s.drift    = 0;
+    s.history  = genHistory(s.price, s.vol);
+    addLog('good', `🌱 ${s.name} 停牌 ${REVIVE_DAYS} 天后重新上市，发行价 ¥${s.price.toFixed(2)}`, 0);
+  });
+}
+
+/* =========================================================
+   贷款
+   ========================================================= */
+function takeLoan(){
+  if(state.ended) return;
+  if(state.bankruptcyWarning){
+    showToast('现金为负，请先变卖资产自救');
+    return;
+  }
+  if(state.loans.length >= MAX_LOANS){
+    showToast(`同时最多持有 ${MAX_LOANS} 笔贷款`);
+    return;
+  }
+  const dueDay   = state.day + LOAN_TERM;
+  const preview  = LOAN_AMOUNT * (1 + LOAN_DAILY_RATE * LOAN_TERM);
+  const interest = preview - LOAN_AMOUNT;
+
+  state.loans.push({
+    id: ++state.loanSeq,
+    principal: LOAN_AMOUNT,
+    rate: LOAN_DAILY_RATE,
+    startDay: state.day,
+    dueDay
+  });
+  state.cash += LOAN_AMOUNT;
+
+  addLog('info', `获得银行贷款 ${money(LOAN_AMOUNT)}（日息 ${(LOAN_DAILY_RATE*100).toFixed(1)}%），第 ${dueDay} 天到期应还 ${money(preview)}，其中利息 ${money(interest)}`, 0);
+  showToast(`贷款 ${money(LOAN_AMOUNT)} 到账，30 天后需还 ${money(preview)}（利息 ${money(interest)}）`);
+  render();
+}
+
+function repayLoan(id){
+  if(state.ended) return;
+  const loan = state.loans.find(l => String(l.id) === String(id));
+  if(!loan) return;
+
+  const total = loanTotal(loan);
+  if(state.cash < total){
+    return showToast(`现金不足，提前还清需 ${money(total)}`);
+  }
+
+  state.cash -= total;
+  state.loans = state.loans.filter(l => l !== loan);
+  addLog('info', `提前还清贷款：本金 ${money(loan.principal)} + 利息 ${money(loanInterest(loan))} = ${money(total)}`, 0);
+  showToast(`已还清，支付利息 ${money(loanInterest(loan))}`);
+  render();
+}
+
+function processLoans(){
+  if(!state.loans.length) return;
+
+  const due = state.loans.filter(l => state.day >= l.dueDay);
+  if(!due.length) return;
+  state.loans = state.loans.filter(l => state.day < l.dueDay);
+
+  due.forEach(loan => {
+    const interest = loanInterest(loan);
+    const total    = loanTotal(loan);
+    let need = total - state.cash;
+    let soldQty = 0, soldValue = 0;
+
+    if(need > 0){
+      for(const s of state.stocks){
+        if(need <= 0) break;
+        if(s.shares <= 0 || s.delisted) continue;
+        const avg = s.cost / s.shares;
+        const qty = Math.min(s.shares, Math.ceil(need / s.price));
+        const proceeds = qty * s.price;
+
+        state.cash += proceeds;
+        s.cost   -= avg * qty;
+        s.shares -= qty;
+        if(s.shares <= 0){ s.shares = 0; s.cost = 0; }
+
+        soldQty += qty;
+        soldValue += proceeds;
+        need -= proceeds;
+      }
+    }
+
+    state.cash -= total;
+
+    if(soldQty > 0){
+      addLog('bad', `贷款到期！应还 ${money(total)}（本金 ${money(loan.principal)} + 利息 ${money(interest)}）。现金不足，强制卖出 ${soldQty} 股（${money(soldValue)}）用于还款。`, 0);
+    }else{
+      addLog('info', `贷款到期，已自动扣款 ${money(total)}（本金 ${money(loan.principal)} + 利息 ${money(interest)}）`, 0);
+    }
+  });
+}
+
+/* =========================================================
+   车 / 房
+   ========================================================= */
+function sellCar(){
+  if(state.ended || state.carSold) return;
+  state.carSold = true;
+  state.cash += CAR.value;
+  addLog('info', `🚗 卖出私家车，获得 ${money(CAR.value)}，日用开销 +¥${CAR.daily}/天`, 0);
+  showToast(`卖车成功，到账 ${money(CAR.value)}`);
+  render();
+}
+
+function redeemCar(){
+  if(state.ended || !state.carSold) return;
+  if(state.cash < CAR.redeem) return showToast(`现金不足，赎回需 ${money(CAR.redeem)}`);
+  state.cash -= CAR.redeem;
+  state.carSold = false;
+  addLog('info', `🚗 赎回私家车，花费 ${money(CAR.redeem)}，日用开销恢复`, 0);
+  showToast('车辆已赎回');
+  render();
+}
+
+function sellHouse(){
+  if(state.ended || state.houseSold) return;
+  state.houseSold = true;
+  state.cash += HOUSE.value;
+  addLog('info', `🏠 卖出房产，获得 ${money(HOUSE.value)}，日用开销 +¥${HOUSE.daily}/天`, 0);
+  showToast(`卖房成功，到账 ${money(HOUSE.value)}`);
+  render();
+}
+
+function redeemHouse(){
+  if(state.ended || !state.houseSold) return;
+  if(state.cash < HOUSE.redeem) return showToast(`现金不足，赎回需 ${money(HOUSE.redeem)}`);
+  state.cash -= HOUSE.redeem;
+  state.houseSold = false;
+  addLog('info', `🏠 赎回房产，花费 ${money(HOUSE.redeem)}，日用开销恢复`, 0);
+  showToast('房产已赎回');
+  render();
+}
+
+/* =========================================================
+   行情推进
+   ========================================================= */
+function nextDay(){
+  if(state.ended) return;
+
+  /* 破产警告期间禁止推进 */
+  if(state.bankruptcyWarning){
+    showToast('⚠️ 现金为负！请先变卖资产（卖车/卖房/卖股票）以自救');
+    return;
+  }
+
+  state.day++;
+
+  /* 1. 复活到期股票 */
+  reviveStocks();
+
+  /* 2. 违法事件：极小概率直接退市 */
+  let activeNow = state.stocks.map((s,i)=>s.delisted?-1:i).filter(i=>i>=0);
+  if(activeNow.length && Math.random() < ILLEGAL_CHANCE){
+    const idx = pick(activeNow);
+    const s = state.stocks[idx];
+    showToast(`🚨 ${s.name} 涉嫌严重违法被强制退市！`);
+    delistStock(s, 'illegal');
+  }
+
+  /* 3. 市场波动 */
+  const marketShock  = randn() * 0.008;
+  const marketEvent  = Math.random() < 0.20 ? pick(MARKET_EVENTS) : null;
+  const marketImpact = marketEvent ? rand(marketEvent.impact[0], marketEvent.impact[1]) : 0;
+
+  const activeIdx = state.stocks.map((s,i)=>s.delisted?-1:i).filter(i=>i>=0);
+  let evIdx = -1, evDef = null, evImpact = 0;
+  if(activeIdx.length && Math.random() < 0.42){
+    evIdx = pick(activeIdx);
+    evDef = pick(STOCK_EVENTS);
+  }
+
+  /* 4. 价格波动 + 跌破底价退市判定 */
+  const delistQueue = [];
+  state.stocks.forEach((s, i) => {
+    if(s.delisted) return;
+
+    let move = s.drift + randn() * s.vol + s.beta * (marketShock + marketImpact);
+    if(i === evIdx){
+      evImpact = rand(evDef.impact[0], evDef.impact[1]);
+      move += evImpact;
+      s.drift += evImpact * 0.25;
+    }
+    s.drift = clamp(s.drift * 0.75, -0.035, 0.035);
+    s.price = Math.max(0, s.price * (1 + move));
+    s.history.push(s.price);
+    if(s.history.length > 150) s.history.shift();
+
+    if(s.price > 0 && s.price < s.minPrice) delistQueue.push(s);
+  });
+
+  /* 5. 事件日志 */
+  if(marketEvent) addLog('macro', marketEvent.t, marketImpact);
+  if(evDef){
+    const nm = state.stocks[evIdx].name;
+    const text = evDef.t.replace('{n}', nm).replace('{p}', Math.round(rand(12, 88)));
+    addLog(evImpact >= 0 ? 'good' : 'bad', text, evImpact);
+  }
+
+  /* 6. 跌破底价退市处理 */
+  delistQueue.forEach(s => delistStock(s));
+  if(delistQueue.length){
+    showToast(`💀 ${delistQueue.map(s=>s.name).join('、')} 已退市，${REVIVE_DAYS} 天后复活`);
+  }
+
+  /* 7. 每日收支 */
+  const flow = dailyNetFlow();
+  state.cash += flow.net;
+
+  /* 8. 贷款到期（含利息） */
+  processLoans();
+
+  /* 9. 渲染（内部自动判定破产） */
+  render();
+}
+
+/* =========================================================
+   结束游戏
+   ========================================================= */
+function endGame(reason){
+  if(state.ended) return;
+  state.ended = true;
+  state.endReason = reason;
+  state.bankruptcyWarning = false;
+
+  if(autoTimer){ clearInterval(autoTimer); autoTimer = null; }
+  $('btnAuto').textContent = '自动播放';
+  $('btnAuto').classList.remove('active');
+
+  /* 强制清算持仓 */
+  let stockValue = 0, stockCount = 0;
+  state.stocks.forEach(s => {
+    if(s.shares > 0){
+      stockValue += s.price * s.shares;
+      stockCount += s.shares;
+      state.cash   += s.price * s.shares;
+      s.shares = 0;
+      s.cost   = 0;
+    }
+  });
+
+  /* 偿还所有贷款（本金 + 利息） */
+  const debt      = totalDebt();
+  const principal = totalPrincipal();
+  const interest  = debt - principal;
+  state.cash -= debt;
+  state.loans = [];
+
+  render();
+  showEndModal(reason, { stockValue, stockCount, debt, principal, interest });
+}
+
+function showEndModal(reason, info){
+  const net  = state.cash;
+  const pnl  = net - state.startCash;
+  const pct  = state.startCash ? pnl / state.startCash * 100 : 0;
+  const win  = pnl >= 0;
+  const isBankrupt = reason === 'bankrupt';
+
+  $('endIcon').textContent  = isBankrupt ? '💥' : '🎉';
+  $('endTitle').textContent = isBankrupt ? '真正破产' : '见好就收';
+  $('endTitle').style.color = isBankrupt ? 'var(--red)' : 'var(--green)';
+  $('endSub').textContent = isBankrupt
+    ? `第 ${state.day} 天，你已变卖所有资产仍无法挽回局面，触发真正破产清算：持仓被卖出、贷款本息被强制偿还。`
+    : `第 ${state.day} 天，你选择清仓离场，锁定收益。`;
+
+  const debtRow = info.debt > 0
+    ? `<div class="row"><span>偿还贷款本息</span><b class="down">${money(info.debt)}</b></div>
+       <div class="row"><span>其中利息</span><b class="down">${money(info.interest)}</b></div>`
+    : '';
+
+  $('endBody').innerHTML = `
+    <div class="row"><span>交易天数</span><b>${state.day} 天</b></div>
+    <div class="row"><span>清仓股数</span><b>${stockCount.toLocaleString('zh-CN')} 股</b></div>
+    <div class="row"><span>清仓所得</span><b>${money(info.stockValue)}</b></div>
+    ${debtRow}
+    <div class="row"><span>最终现金</span><b class="${net >= 0 ? 'up' : 'down'}">${money(net)}</b></div>
+    <div class="row"><span>总盈亏</span><b class="${win ? 'up' : 'down'}">${pnl >= 0 ? '+' : ''}${money(pnl)}（${pct >= 0 ? '+' : ''}${pct.toFixed(2)}%）</b></div>
+  `;
+
+  $('overlay').classList.add('show');
+}
+
+/* =========================================================
+   交易
+   ========================================================= */
+function buyStock(){
+  if(state.ended) return;
+  const s = state.stocks[state.selected];
+  if(s.delisted) return showToast('该股票已退市，无法买入');
+  const qty = parseInt($('qty').value, 10);
+  if(!qty || qty <= 0) return showToast('请输入有效的买入数量');
+  const cost = s.price * qty;
+  if(cost > state.cash) return showToast('现金不足，买不起 😢');
+
+  state.cash -= cost;
+  s.cost += cost;
+  s.shares += qty;
+  showToast(`买入 ${s.name} ${qty} 股，花费 ${money(cost)}`);
+  render();
+}
+
+function sellStock(){
+  if(state.ended) return;
+  const s = state.stocks[state.selected];
+  if(s.delisted) return showToast('该股票已退市，无法卖出');
+  const qty = parseInt($('qty').value, 10);
+  if(!qty || qty <= 0) return showToast('请输入有效的卖出数量');
+  if(qty > s.shares) return showToast('持仓不足，无法卖出');
+
+  const avg  = s.shares > 0 ? s.cost / s.shares : 0;
+  const gain = (s.price - avg) * qty;
+
+  state.cash += s.price * qty;
+  s.cost -= avg * qty;
+  s.shares -= qty;
+  if(s.shares <= 0){ s.shares = 0; s.cost = 0; }
+
+  showToast(`卖出 ${s.name} ${qty} 股，${gain >= 0 ? '盈利' : '亏损'} ${money(Math.abs(gain))}`);
+  render();
+}
+
+/* =========================================================
+   绘图
+   ========================================================= */
+function fitCanvas(cv){
+  const dpr = window.devicePixelRatio || 1;
+  const rect = cv.getBoundingClientRect();
+  if(rect.width === 0 || rect.height === 0) return null;
+  cv.width  = Math.round(rect.width  * dpr);
+  cv.height = Math.round(rect.height * dpr);
+  const ctx = cv.getContext('2d');
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  return { ctx, w: rect.width, h: rect.height };
+}
+
+function drawSpark(cv, s){
+  const fit = fitCanvas(cv);
+  if(!fit) return;
+  const { ctx, w, h } = fit;
+  const data = s.history.slice(-30);
+  if(data.length < 2) return;
+
+  let min = Math.min(...data), max = Math.max(...data);
+  if(max - min < 1e-6){ min -= 1; max += 1; }
+  const pad = 3;
+  const X = i => pad + (w - pad*2) * (i / (data.length - 1));
+  const Y = v => pad + (h - pad*2) * (1 - (v - min) / (max - min));
+  const up = data[data.length-1] >= data[0];
+
+  ctx.beginPath();
+  data.forEach((v,i) => i ? ctx.lineTo(X(i), Y(v)) : ctx.moveTo(X(i), Y(v)));
+  ctx.strokeStyle = up ? '#3fb950' : '#f85149';
+  ctx.lineWidth = 1.6;
+  ctx.lineJoin = 'round';
+  ctx.lineCap = 'round';
+  ctx.stroke();
+
+  ctx.lineTo(X(data.length-1), h);
+  ctx.lineTo(X(0), h);
+  ctx.closePath();
+  ctx.fillStyle = up ? 'rgba(63,185,80,.13)' : 'rgba(248,81,73,.13)';
+  ctx.fill();
+}
+
+function drawMain(){
+  const cv = $('bigChart');
+  const fit = fitCanvas(cv);
+  if(!fit) return;
+  const { ctx, w, h } = fit;
+  const s = state.stocks[state.selected];
+
+  ctx.clearRect(0, 0, w, h);
+
+  if(s.delisted){
+    ctx.fillStyle = '#0d1219';
+    ctx.fillRect(0, 0, w, h);
+    ctx.fillStyle = 'rgba(248,81,73,.10)';
+    ctx.fillRect(0, 0, w, h);
+
+    const left = Math.max(0, s.reviveDay - state.day);
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillStyle = '#f85149';
+    ctx.font = 'bold 17px -apple-system, sans-serif';
+    ctx.fillText('⛔ 已退市', w/2, h/2 - 16);
+    ctx.fillStyle = '#8b98a9';
+    ctx.font = '13px -apple-system, sans-serif';
+    ctx.fillText(`第 ${s.reviveDay} 天重新上市 · 剩余 ${left} 天`, w/2, h/2 + 14);
+    ctx.textAlign = 'left';
+    ctx.textBaseline = 'alphabetic';
+    return;
+  }
+
+  const data = s.history;
+  let min = Math.min(...data), max = Math.max(...data);
+  if(max - min < 1e-6){ min -= 1; max += 1; }
+  const r = max - min;
+  min -= r * 0.12;
+  max += r * 0.12;
+
+  const pad = { l:10, r:10, t:16, b:16 };
+  const X = i => pad.l + (w - pad.l - pad.r) * (i / Math.max(1, data.length - 1));
+  const Y = v => pad.t + (h - pad.t - pad.b) * (1 - (v - min) / (max - min));
+
+  ctx.strokeStyle = 'rgba(255,255,255,.055)';
+  ctx.lineWidth = 1;
+  for(let i = 0; i <= 4; i++){
+    const y = pad.t + (h - pad.t - pad.b) * i / 4;
+    ctx.beginPath(); ctx.moveTo(pad.l, y); ctx.lineTo(w - pad.r, y); ctx.stroke();
+  }
+
+  if(s.minPrice >= min && s.minPrice <= max){
+    const ly = Y(s.minPrice);
+    ctx.save();
+    ctx.setLineDash([4, 4]);
+    ctx.strokeStyle = 'rgba(248,81,73,.55)';
+    ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(pad.l, ly); ctx.lineTo(w - pad.r, ly); ctx.stroke();
+    ctx.restore();
+    ctx.fillStyle = 'rgba(248,81,73,.85)';
+    ctx.font = '10.5px -apple-system, sans-serif';
+    ctx.textAlign = 'right';
+    ctx.fillText('退市线 ¥' + s.minPrice.toFixed(2), w - pad.r - 3, ly - 4);
+    ctx.textAlign = 'left';
+  }
+
+  const up = data[data.length-1] >= data[0];
+  const lineColor = up ? '#3fb950' : '#f85149';
+
+  const grad = ctx.createLinearGradient(0, pad.t, 0, h - pad.b);
+  grad.addColorStop(0, up ? 'rgba(63,185,80,.30)' : 'rgba(248,81,73,.30)');
+  grad.addColorStop(1, 'rgba(0,0,0,0)');
+
+  ctx.beginPath();
+  data.forEach((v,i) => i ? ctx.lineTo(X(i), Y(v)) : ctx.moveTo(X(i), Y(v)));
+  ctx.lineTo(X(data.length-1), h - pad.b);
+  ctx.lineTo(X(0), h - pad.b);
+  ctx.closePath();
+  ctx.fillStyle = grad;
+  ctx.fill();
+
+  ctx.beginPath();
+  data.forEach((v,i) => i ? ctx.lineTo(X(i), Y(v)) : ctx.moveTo(X(i), Y(v)));
+  ctx.strokeStyle = lineColor;
+  ctx.lineWidth = 2.2;
+  ctx.lineJoin = 'round';
+  ctx.lineCap = 'round';
+  ctx.shadowColor = alpha(lineColor, .7);
+  ctx.shadowBlur = 10;
+  ctx.stroke();
+  ctx.shadowBlur = 0;
+
+  const lx = X(data.length-1), ly = Y(data[data.length-1]);
+  ctx.beginPath();
+  ctx.arc(lx, ly, 5.5, 0, Math.PI*2);
+  ctx.fillStyle = alpha(lineColor, .28);
+  ctx.fill();
+  ctx.beginPath();
+  ctx.arc(lx, ly, 3, 0, Math.PI*2);
+  ctx.fillStyle = lineColor;
+  ctx.fill();
+
+  ctx.font = '11px -apple-system, sans-serif';
+  ctx.fillStyle = 'rgba(139,152,169,.75)';
+  ctx.textAlign = 'left';
+  ctx.fillText('最高 ' + Math.max(...data).toFixed(2), pad.l + 4, pad.t + 10);
+  ctx.fillText('最低 ' + Math.min(...data).toFixed(2), pad.l + 4, h - pad.b - 4);
+}
+
+/* =========================================================
+   渲染
+   ========================================================= */
+function render(){
+  /* ---------- 破产判定 ---------- */
+  if(!state.ended){
+    if(state.cash < 0){
+      if(hasLiquidatable()){
+        if(!state.bankruptcyWarning){
+          addLog('bad', `⚠️ 现金跌破 0（${money(state.cash)}）！请变卖资产（卖车/卖房/卖股票）自救，否则将破产清算。`, 0);
+        }
+        state.bankruptcyWarning = true;
+      }else{
+        state.bankruptcyWarning = false;
+        endGame('bankrupt');
+        return;
+      }
+    }else{
+      state.bankruptcyWarning = false;
+    }
+  }
+
+  renderHeader();
+  renderList();
+  renderChartInfo();
+  drawMain();
+  renderTrade();
+  renderAssets();
+  renderLoans();
+  renderLog();
+  renderButtons();
+  renderBanner();
+}
+
+function renderBanner(){
+  const b = $('bankruptBanner');
+  if(state.bankruptcyWarning){
+    b.classList.add('show');
+    document.body.classList.add('has-banner');
+  }else{
+    b.classList.remove('show');
+    document.body.classList.remove('has-banner');
+  }
+}
+
+function renderHeader(){
+  const debt = totalDebt();
+  const net  = state.cash + holdingsValue() - debt;
+  const pnl  = (net - state.startCash) / state.startCash * 100;
+  const flow = dailyNetFlow();
+
+  $('sDay').textContent = '第 ' + state.day + ' 天';
+
+  const cashEl = $('sCash');
+  cashEl.textContent = money(state.cash);
+  cashEl.className = state.cash < 0 ? 'down' : '';
+
+  const flowEl = $('sFlow');
+  flowEl.textContent = (flow.net >= 0 ? '+' : '') + money(flow.net);
+  flowEl.className = flow.net >= 0 ? 'up' : 'down';
+
+  const debtEl = $('sDebt');
+  debtEl.textContent = money(debt);
+  debtEl.className = debt > 0 ? 'down' : '';
+
+  $('sNet').textContent = money(net);
+
+  const pnlEl = $('sPnl');
+  pnlEl.textContent = (pnl >= 0 ? '+' : '') + pnl.toFixed(2) + '%';
+  pnlEl.className = pnl >= 0 ? 'up' : 'down';
+}
+
+function renderList(){
+  const el = $('stockList');
+  let html = '';
+
+  state.stocks.forEach((s, i) => {
+    if(s.delisted){
+      const left = Math.max(0, s.reviveDay - state.day);
+      html += `
+        <div class="stock-row delisted ${i === state.selected ? 'active' : ''}" data-i="${i}">
+          <div class="s-emoji" style="background:rgba(248,81,73,.10); color:#6b7480">${s.emoji}</div>
+          <div class="s-info">
+            <div class="s-name" style="color:#6b7480">${s.name}</div>
+            <div class="s-code">${s.code} · 已退市</div>
+          </div>
+          <div class="s-price" style="min-width:96px">
+            <div class="p" style="color:#6b7480">退市</div>
+            <div class="chg down">${left} 天后复活</div>
+          </div>
+        </div>`;
+      return;
+    }
+
+    const prev = s.history[s.history.length - 2] ?? s.price;
+    const chg  = (s.price - prev) / prev * 100;
+    const cls  = chg >= 0 ? 'up' : 'down';
+    const sign = chg >= 0 ? '+' : '';
+    const near = s.price < s.minPrice * 1.20;
+
+    html += `
+      <div class="stock-row ${i === state.selected ? 'active' : ''}" data-i="${i}">
+        <div class="s-emoji" style="background:${alpha(s.color,.15)}; color:${s.color}">${s.emoji}</div>
+        <div class="s-info">
+          <div class="s-name">${s.name}</div>
+          <div class="s-code">
+            ${s.code} · 底价 ¥${s.minPrice.toFixed(2)}${s.shares ? ' · 持仓 ' + s.shares : ''}
+            ${near ? ' <span style="color:#f85149">⚠️逼近退市</span>' : ''}
+          </div>
+        </div>
+        <canvas class="spark"></canvas>
+        <div class="s-price">
+          <div class="p">¥${s.price.toFixed(2)}</div>
+          <div class="chg ${cls}">${sign}${chg.toFixed(2)}%</div>
+        </div>
+      </div>`;
+  });
+
+  el.innerHTML = html;
+
+  el.querySelectorAll('.stock-row').forEach(row => {
+    row.addEventListener('click', () => {
+      state.selected = parseInt(row.dataset.i, 10);
+      render();
+    });
+  });
+  el.querySelectorAll('.spark').forEach(cv => {
+    const i = parseInt(cv.closest('.stock-row').dataset.i, 10);
+    drawSpark(cv, state.stocks[i]);
+  });
+}
+
+function renderChartInfo(){
+  const s = state.stocks[state.selected];
+  const titleEl = $('chartTitle');
+  const priceEl = $('chartPrice');
+
+  if(s.delisted){
+    titleEl.innerHTML = `${s.name}  ${s.code} <span style="font-size:11px;color:#f85149">⛔ 退市中</span>`;
+    priceEl.textContent = '退市';
+    priceEl.className = 'chart-price delisted';
+  }else{
+    titleEl.innerHTML = `${s.name}  ${s.code} <span style="font-size:11px;color:#8b98a9">退市线 ¥${s.minPrice.toFixed(2)}</span>`;
+    priceEl.textContent = '¥' + s.price.toFixed(2);
+    priceEl.className = 'chart-price';
+  }
+}
+
+function renderTrade(){
+  const s = state.stocks[state.selected];
+  const canTrade = !s.delisted && !state.ended;
+
+  $('maxBuy').textContent  = canTrade ? Math.max(0, Math.floor(state.cash / s.price)) : 0;
+  $('allSell').textContent = s.shares;
+
+  $('btnBuy').disabled  = !canTrade;
+  $('btnSell').disabled = !canTrade;
+  $('btnMax').disabled  = !canTrade;
+  $('btnAll').disabled  = !canTrade;
+
+  const holdEl = $('holding');
+  if(state.ended){
+    holdEl.innerHTML = '本轮已结束，请点击「重新开始」开启新的游戏。';
+  }else if(state.bankruptcyWarning){
+    holdEl.innerHTML =
+      `<b class="down">⚠️ 现金为负！</b> 请立即变卖资产（卖车/卖房/卖股票）自救，否则将真正破产。`;
+  }else if(s.delisted){
+    const left = Math.max(0, s.reviveDay - state.day);
+    holdEl.innerHTML =
+      `该股票已退市，第 <b>${s.reviveDay}</b> 天重新上市（剩余 <b class="down">${left}</b> 天），期间无法交易。`;
+  }else if(s.shares > 0){
+    const avg = s.cost / s.shares;
+    const mv  = s.price * s.shares;
+    const pnl = (s.price - avg) / avg * 100;
+    const cls = pnl >= 0 ? 'up' : 'down';
+    holdEl.innerHTML =
+      `持仓 <b>${s.shares}</b> 股 · 成本 <b>¥${avg.toFixed(2)}</b> · 市值 <b>${money(mv)}</b> · ` +
+      `浮动盈亏 <b class="${cls}">${pnl >= 0 ? '+' : ''}${pnl.toFixed(2)}%</b>`;
+  }else{
+    holdEl.textContent = '暂无持仓，选择股票后即可买入。';
+  }
+}
+
+function renderAssets(){
+  const flow = dailyNetFlow();
+  $('dailyCostTxt').textContent = '-¥' + flow.cost;
+
+  /* 车 */
+  const carDesc = $('carDesc');
+  const carBtn  = $('btnCar');
+  if(state.carSold){
+    carDesc.innerHTML = `已卖出 · 日用开销 <b class="down">+¥${CAR.daily}</b>/天 · 赎回需 <b>${money(CAR.redeem)}</b>`;
+    carBtn.textContent = '赎回车';
+    carBtn.className = 'btn';
+    carBtn.disabled = state.ended || state.cash < CAR.redeem;
+  }else{
+    carDesc.innerHTML = `持有中 · 卖出立得 <b class="up">${money(CAR.value)}</b>，日用开销 +¥${CAR.daily}/天`;
+    carBtn.textContent = '卖车';
+    carBtn.className = 'btn gold';
+    carBtn.disabled = state.ended;
+  }
+
+  /* 房 */
+  const houseDesc = $('houseDesc');
+  const houseBtn  = $('btnHouse');
+  if(state.houseSold){
+    houseDesc.innerHTML = `已卖出 · 日用开销 <b class="down">+¥${HOUSE.daily}</b>/天 · 赎回需 <b>${money(HOUSE.redeem)}</b>`;
+    houseBtn.textContent = '赎回房';
+    houseBtn.className = 'btn';
+    houseBtn.disabled = state.ended || state.cash < HOUSE.redeem;
+  }else{
+    houseDesc.innerHTML = `持有中 · 卖出立得 <b class="up">${money(HOUSE.value)}</b>，日用开销 +¥${HOUSE.daily}/天`;
+    houseBtn.textContent = '卖房';
+    houseBtn.className = 'btn gold';
+    houseBtn.disabled = state.ended;
+  }
+}
+
+function renderLoans(){
+  const list = $('loanList');
+  const btn  = $('btnLoan');
+
+  btn.disabled = state.ended || state.loans.length >= MAX_LOANS || state.bankruptcyWarning;
+  btn.textContent = state.loans.length >= MAX_LOANS
+    ? `已达上限（${MAX_LOANS} 笔）`
+    : `借款 ${money(LOAN_AMOUNT)}`;
+
+  if(!state.loans.length){
+    list.innerHTML = '<div class="no-loan">当前无贷款。日息 0.1%，30 天后自动扣款还本付息。</div>';
+    return;
+  }
+
+  list.innerHTML = state.loans.map(l => {
+    const left     = l.dueDay - state.day;
+    const urgent   = left <= 5 ? 'urgent' : '';
+    const interest = loanInterest(l);
+    const total    = loanTotal(l);
+    return `
+      <div class="loan-item">
+        <span class="li-amt">${money(l.principal)}</span>
+        <span class="li-due">
+          第${l.startDay}天借款 · 第${l.dueDay}天到期 · 剩余 <b class="${urgent}">${left} 天</b><br>
+          应还 <b>${money(total)}</b>（利息 <span class="int">${money(interest)}</span>）
+        </span>
+        <button class="btn" data-repay="${l.id}" ${state.ended ? 'disabled' : ''}>还 ${money(total)}</button>
+      </div>`;
+  }).join('');
+}
+
+function renderLog(){
+  const el = $('logList');
+  if(!state.log.length){
+    el.innerHTML = '<div class="empty">暂无消息</div>';
+    return;
+  }
+  el.innerHTML = state.log.map(l => {
+    const sign = l.impact >= 0 ? '+' : '';
+    const cls  = l.impact >= 0 ? 'up' : 'down';
+    return `<div class="log-item ${l.type}">
+      <span class="log-day">第${l.day}天</span>
+      <span class="log-text">${l.text}</span>
+      ${l.impact ? `<span class="log-impact ${cls}">${sign}${(l.impact*100).toFixed(1)}%</span>` : ''}
+    </div>`;
+  }).join('');
+}
+
+function renderButtons(){
+  const blocked = state.ended || state.bankruptcyWarning;
+  $('btnNext').disabled   = blocked;
+  $('btnAuto').disabled   = blocked;
+  $('btnSettle').disabled = state.ended;
+  $('btnLoan').disabled   = state.ended || state.loans.length >= MAX_LOANS || state.bankruptcyWarning;
+
+  if(blocked && autoTimer){
+    clearInterval(autoTimer);
+    autoTimer = null;
+    $('btnAuto').textContent = '自动播放';
+    $('btnAuto').classList.remove('active');
+  }
+}
+
+/* =========================================================
+   交互绑定
+   ========================================================= */
+$('btnNext').addEventListener('click', nextDay);
+
+$('btnAuto').addEventListener('click', () => {
+  if(state.ended || state.bankruptcyWarning) return;
+  const btn = $('btnAuto');
+  if(autoTimer){
+    clearInterval(autoTimer);
+    autoTimer = null;
+    btn.textContent = '自动播放';
+    btn.classList.remove('active');
+  }else{
+    autoTimer = setInterval(nextDay, 1000);
+    btn.textContent = '⏸ 暂停';
+    btn.classList.add('active');
+  }
+});
+
+$('btnSettle').addEventListener('click', () => {
+  if(state.ended) return;
+  endGame('settle');
+});
+
+function resetGame(){
+  if(autoTimer){ clearInterval(autoTimer); autoTimer = null; }
+  $('btnAuto').textContent = '自动播放';
+  $('btnAuto').classList.remove('active');
+  $('overlay').classList.remove('show');
+  $('qty').value = 100;
+  initState();
+  render();
+  showToast(`已重置，本金 ${money(START_CASH)}`);
+}
+
+$('btnReset').addEventListener('click', resetGame);
+$('btnRestart').addEventListener('click', resetGame);
+
+$('btnBuy').addEventListener('click', buyStock);
+$('btnSell').addEventListener('click', sellStock);
+$('btnLoan').addEventListener('click', takeLoan);
+
+$('btnCar').addEventListener('click', () => {
+  state.carSold ? redeemCar() : sellCar();
+});
+$('btnHouse').addEventListener('click', () => {
+  state.houseSold ? redeemHouse() : sellHouse();
+});
+
+$('btnMax').addEventListener('click', () => {
+  const s = state.stocks[state.selected];
+  if(state.ended || s.delisted) return;
+  const max = Math.floor(state.cash / s.price);
+  if(max <= 0) return showToast('现金不足以买入 1 股');
+  $('qty').value = max;
+});
+
+$('btnAll').addEventListener('click', () => {
+  const s = state.stocks[state.selected];
+  if(state.ended || s.delisted) return;
+  if(s.shares <= 0) return showToast('当前没有持仓');
+  $('qty').value = s.shares;
+});
+
+$('loanList').addEventListener('click', e => {
+  const btn = e.target.closest('[data-repay]');
+  if(!btn || btn.disabled) return;
+  repayLoan(btn.dataset.repay);
+});
+
+let resizeTimer = null;
+window.addEventListener('resize', () => {
+  clearTimeout(resizeTimer);
+  resizeTimer = setTimeout(() => { drawMain(); renderList(); }, 120);
+});
+
+/* =========================================================
+   启动
+   ========================================================= */
+initState();
+render();
+</script>
+</body>
+</html>
