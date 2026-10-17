@@ -18,9 +18,31 @@ body{
   font-family:-apple-system,BlinkMacSystemFont,"PingFang SC","Microsoft YaHei",Segoe UI,sans-serif;
   min-height:100vh;
   transition:padding-top .3s;
+  overflow-x:hidden;
 }
 body.has-banner{padding-top:60px;}
 .app{max-width:1180px; margin:0 auto; display:flex; flex-direction:column; gap:14px;}
+
+/* ---------- 飘字动画 ---------- */
+.fly-money {
+  position: fixed;
+  transform: translateX(-50%);
+  font-size: 18px;
+  font-weight: 900;
+  pointer-events: none;
+  z-index: 999;
+  animation: flyUp 1.2s cubic-bezier(0.2, 0.8, 0.2, 1) forwards;
+  text-shadow: 0 2px 10px rgba(0,0,0,0.8);
+  font-variant-numeric: tabular-nums;
+}
+.fly-money.down { color: #f85149; }
+.fly-money.up { color: #3fb950; }
+@keyframes flyUp {
+  0% { opacity: 0; transform: translate(-50%, 10px) scale(0.8); }
+  20% { opacity: 1; transform: translate(-50%, -5px) scale(1.1); }
+  80% { opacity: 1; transform: translate(-50%, -25px) scale(1); }
+  100% { opacity: 0; transform: translate(-50%, -40px) scale(0.9); }
+}
 
 /* ---------- 破产警告横幅 ---------- */
 .bankrupt-banner{
@@ -40,6 +62,7 @@ body.has-banner{padding-top:60px;}
   background:linear-gradient(180deg,#18202b,#131a23);
   border:1px solid var(--border); border-radius:16px; padding:14px 20px;
   box-shadow:0 10px 30px rgba(0,0,0,.35);
+  position:relative; z-index:10;
 }
 .brand{display:flex; align-items:center; gap:12px;}
 .logo{font-size:30px; filter:drop-shadow(0 0 10px rgba(88,166,255,.6));}
@@ -48,10 +71,13 @@ body.has-banner{padding-top:60px;}
 .stats{display:flex; gap:10px; flex-wrap:wrap;}
 .stat{
   background:var(--panel2); border:1px solid var(--border); border-radius:11px;
-  padding:7px 14px; min-width:104px;
+  padding:7px 14px; min-width:104px; position:relative;
 }
 .stat span{display:block; font-size:11px; color:var(--muted); margin-bottom:3px;}
-.stat b{font-size:15px; font-variant-numeric:tabular-nums;}
+.stat b{font-size:15px; font-variant-numeric:tabular-nums; transition:all 0.2s; display:inline-block;}
+/* 闪烁动画 */
+.flash-down{color:var(--red) !important; transform:scale(1.2);}
+.flash-up{color:var(--green) !important; transform:scale(1.2);}
 
 /* ---------- 布局 ---------- */
 .main{display:grid; grid-template-columns:1fr 1fr; gap:14px;}
@@ -174,7 +200,8 @@ body.has-banner{padding-top:60px;}
 .loan-item .li-due b{color:var(--text);}
 .loan-item .li-due b.urgent{color:var(--red);}
 .loan-item .li-due .int{color:var(--yellow);}
-.loan-item .btn{padding:5px 11px; font-size:11.5px; flex:0 0 auto;}
+.loan-item .btn{padding:5px 11px; font-size:11.5px; flex:0 0 auto; background:#2a2016; border-color:#4a3621; color:#e3b341;}
+.loan-item .btn:hover{background:#3d2e17; border-color:#5c432a;}
 .no-loan{font-size:12.5px; color:var(--muted); padding:8px 12px; background:#0e151e; border-radius:10px;}
 
 /* ---------- 日志 ---------- */
@@ -380,30 +407,51 @@ function showToast(msg){
   t.textContent = msg;
   t.classList.add('show');
   clearTimeout(t._timer);
-  t._timer = setTimeout(()=>t.classList.remove('show'), 2000);
+  t._timer = setTimeout(()=>t.classList.remove('show'), 2200);
+}
+
+// 核心视觉反馈：飘字 + 缩放闪烁
+function flashCash(isDown, amount = 0){
+  const el = $('sCash');
+  el.classList.remove('flash-up', 'flash-down');
+  void el.offsetWidth; // 触发重绘
+  el.classList.add(isDown ? 'flash-down' : 'flash-up');
+  setTimeout(() => el.classList.remove('flash-down', 'flash-up'), 300);
+
+  if(amount > 0){
+    const fly = document.createElement('div');
+    fly.className = 'fly-money ' + (isDown ? 'down' : 'up');
+    fly.textContent = (isDown ? '-' : '+') + money(amount);
+    document.body.appendChild(fly);
+
+    const rect = el.getBoundingClientRect();
+    fly.style.left = (rect.left + rect.width / 2) + 'px';
+    fly.style.top = (rect.top - 5) + 'px';
+
+    setTimeout(() => fly.remove(), 1200);
+  }
 }
 
 /* =========================================================
    全局参数
    ========================================================= */
-const START_CASH = 1000000;      // 本金 100 万
+const START_CASH = 1000000;
 
-const WAGE      = 300;           // 每日工资
-const BASE_COST = 400;           // 基础日用开销
+const WAGE      = 300;
+const BASE_COST = 400;
 
-const LOAN_AMOUNT     = 500000;  // 单笔贷款本金 50 万
-const LOAN_TERM       = 30;      // 30 天到期
-const MAX_LOANS       = 100;     // 最多 100 笔
-const LOAN_DAILY_RATE = 0.001;   // 日利率 0.1%
+const LOAN_AMOUNT     = 500000;
+const LOAN_TERM       = 30;
+const MAX_LOANS       = 100;
+const LOAN_DAILY_RATE = 0.001;
 
-const MIN_RATIO   = 0.55;        // 退市线：初始价 × 55%
-const REVIVE_DAYS = 30;          // 退市后 30 天复活
+const MIN_RATIO   = 0.55;
+const REVIVE_DAYS = 30;
 const REVIVE_LOW  = 0.60;
 const REVIVE_HIGH = 0.90;
 
-const ILLEGAL_CHANCE = 0.01;     // 违法事件：每天 1% 概率，直接退市
+const ILLEGAL_CHANCE = 0.01;
 
-/* 车 / 房 */
 const CAR   = { name:'私家车', value:250000,  redeem:300000,  daily:100 };
 const HOUSE = { name:'房产',   value:3000000, redeem:4000000, daily:200 };
 
@@ -530,7 +578,6 @@ function dailyNetFlow(){
 /* =========================================================
    破产判定
    ========================================================= */
-/* 是否还有可变卖的资产（车 / 房 / 股票） */
 function hasLiquidatable(){
   if(!state.carSold) return true;
   if(!state.houseSold) return true;
@@ -576,7 +623,7 @@ function reviveStocks(){
 }
 
 /* =========================================================
-   贷款
+   贷款操作
    ========================================================= */
 function takeLoan(){
   if(state.ended) return;
@@ -602,8 +649,10 @@ function takeLoan(){
   state.cash += LOAN_AMOUNT;
 
   addLog('info', `获得银行贷款 ${money(LOAN_AMOUNT)}（日息 ${(LOAN_DAILY_RATE*100).toFixed(1)}%），第 ${dueDay} 天到期应还 ${money(preview)}，其中利息 ${money(interest)}`, 0);
-  showToast(`贷款 ${money(LOAN_AMOUNT)} 到账，30 天后需还 ${money(preview)}（利息 ${money(interest)}）`);
+  showToast(`贷款 ${money(LOAN_AMOUNT)} 已到账`);
+  
   render();
+  flashCash(false, LOAN_AMOUNT); // 借款到账提示
 }
 
 function repayLoan(id){
@@ -616,11 +665,21 @@ function repayLoan(id){
     return showToast(`现金不足，提前还清需 ${money(total)}`);
   }
 
+  // 扣款
   state.cash -= total;
   state.loans = state.loans.filter(l => l !== loan);
-  addLog('info', `提前还清贷款：本金 ${money(loan.principal)} + 利息 ${money(loanInterest(loan))} = ${money(total)}`, 0);
-  showToast(`已还清，支付利息 ${money(loanInterest(loan))}`);
+  
+  const intAmount = loanInterest(loan);
+  addLog('info', `提前还清贷款：本金 ${money(loan.principal)} + 利息 ${money(intAmount)} = ${money(total)}。扣除后现金：${money(state.cash)}`, 0);
+  
   render();
+  flashCash(true, total); // 强力扣款提示动画
+  
+  // 滚动回列表顶部
+  const listEl = $('loanList');
+  if(listEl) listEl.scrollTop = 0;
+
+  showToast(`还款成功！已扣除 ${money(total)}`);
 }
 
 function processLoans(){
@@ -629,6 +688,8 @@ function processLoans(){
   const due = state.loans.filter(l => state.day >= l.dueDay);
   if(!due.length) return;
   state.loans = state.loans.filter(l => state.day < l.dueDay);
+
+  let totalDeducted = 0;
 
   due.forEach(loan => {
     const interest = loanInterest(loan);
@@ -656,6 +717,7 @@ function processLoans(){
     }
 
     state.cash -= total;
+    totalDeducted += total;
 
     if(soldQty > 0){
       addLog('bad', `贷款到期！应还 ${money(total)}（本金 ${money(loan.principal)} + 利息 ${money(interest)}）。现金不足，强制卖出 ${soldQty} 股（${money(soldValue)}）用于还款。`, 0);
@@ -663,6 +725,10 @@ function processLoans(){
       addLog('info', `贷款到期，已自动扣款 ${money(total)}（本金 ${money(loan.principal)} + 利息 ${money(interest)}）`, 0);
     }
   });
+
+  if(totalDeducted > 0){
+    setTimeout(() => flashCash(true, totalDeducted), 100);
+  }
 }
 
 /* =========================================================
@@ -675,6 +741,7 @@ function sellCar(){
   addLog('info', `🚗 卖出私家车，获得 ${money(CAR.value)}，日用开销 +¥${CAR.daily}/天`, 0);
   showToast(`卖车成功，到账 ${money(CAR.value)}`);
   render();
+  flashCash(false, CAR.value);
 }
 
 function redeemCar(){
@@ -685,6 +752,7 @@ function redeemCar(){
   addLog('info', `🚗 赎回私家车，花费 ${money(CAR.redeem)}，日用开销恢复`, 0);
   showToast('车辆已赎回');
   render();
+  flashCash(true, CAR.redeem);
 }
 
 function sellHouse(){
@@ -694,6 +762,7 @@ function sellHouse(){
   addLog('info', `🏠 卖出房产，获得 ${money(HOUSE.value)}，日用开销 +¥${HOUSE.daily}/天`, 0);
   showToast(`卖房成功，到账 ${money(HOUSE.value)}`);
   render();
+  flashCash(false, HOUSE.value);
 }
 
 function redeemHouse(){
@@ -704,6 +773,7 @@ function redeemHouse(){
   addLog('info', `🏠 赎回房产，花费 ${money(HOUSE.redeem)}，日用开销恢复`, 0);
   showToast('房产已赎回');
   render();
+  flashCash(true, HOUSE.redeem);
 }
 
 /* =========================================================
@@ -712,7 +782,6 @@ function redeemHouse(){
 function nextDay(){
   if(state.ended) return;
 
-  /* 破产警告期间禁止推进 */
   if(state.bankruptcyWarning){
     showToast('⚠️ 现金为负！请先变卖资产（卖车/卖房/卖股票）以自救');
     return;
@@ -720,10 +789,9 @@ function nextDay(){
 
   state.day++;
 
-  /* 1. 复活到期股票 */
   reviveStocks();
 
-  /* 2. 违法事件：极小概率直接退市 */
+  // 违法事件
   let activeNow = state.stocks.map((s,i)=>s.delisted?-1:i).filter(i=>i>=0);
   if(activeNow.length && Math.random() < ILLEGAL_CHANCE){
     const idx = pick(activeNow);
@@ -732,7 +800,7 @@ function nextDay(){
     delistStock(s, 'illegal');
   }
 
-  /* 3. 市场波动 */
+  // 市场波动
   const marketShock  = randn() * 0.008;
   const marketEvent  = Math.random() < 0.20 ? pick(MARKET_EVENTS) : null;
   const marketImpact = marketEvent ? rand(marketEvent.impact[0], marketEvent.impact[1]) : 0;
@@ -744,7 +812,6 @@ function nextDay(){
     evDef = pick(STOCK_EVENTS);
   }
 
-  /* 4. 价格波动 + 跌破底价退市判定 */
   const delistQueue = [];
   state.stocks.forEach((s, i) => {
     if(s.delisted) return;
@@ -763,7 +830,6 @@ function nextDay(){
     if(s.price > 0 && s.price < s.minPrice) delistQueue.push(s);
   });
 
-  /* 5. 事件日志 */
   if(marketEvent) addLog('macro', marketEvent.t, marketImpact);
   if(evDef){
     const nm = state.stocks[evIdx].name;
@@ -771,20 +837,20 @@ function nextDay(){
     addLog(evImpact >= 0 ? 'good' : 'bad', text, evImpact);
   }
 
-  /* 6. 跌破底价退市处理 */
   delistQueue.forEach(s => delistStock(s));
   if(delistQueue.length){
     showToast(`💀 ${delistQueue.map(s=>s.name).join('、')} 已退市，${REVIVE_DAYS} 天后复活`);
   }
 
-  /* 7. 每日收支 */
   const flow = dailyNetFlow();
   state.cash += flow.net;
+  
+  if(flow.net !== 0) {
+    setTimeout(() => flashCash(flow.net < 0, Math.abs(flow.net)), 50);
+  }
 
-  /* 8. 贷款到期（含利息） */
   processLoans();
 
-  /* 9. 渲染（内部自动判定破产） */
   render();
 }
 
@@ -801,7 +867,6 @@ function endGame(reason){
   $('btnAuto').textContent = '自动播放';
   $('btnAuto').classList.remove('active');
 
-  /* 强制清算持仓 */
   let stockValue = 0, stockCount = 0;
   state.stocks.forEach(s => {
     if(s.shares > 0){
@@ -813,7 +878,6 @@ function endGame(reason){
     }
   });
 
-  /* 偿还所有贷款（本金 + 利息） */
   const debt      = totalDebt();
   const principal = totalPrincipal();
   const interest  = debt - principal;
@@ -872,6 +936,7 @@ function buyStock(){
   s.shares += qty;
   showToast(`买入 ${s.name} ${qty} 股，花费 ${money(cost)}`);
   render();
+  flashCash(true, cost);
 }
 
 function sellStock(){
@@ -892,6 +957,7 @@ function sellStock(){
 
   showToast(`卖出 ${s.name} ${qty} 股，${gain >= 0 ? '盈利' : '亏损'} ${money(Math.abs(gain))}`);
   render();
+  flashCash(false, s.price * qty);
 }
 
 /* =========================================================
@@ -1046,7 +1112,6 @@ function drawMain(){
    渲染
    ========================================================= */
 function render(){
-  /* ---------- 破产判定 ---------- */
   if(!state.ended){
     if(state.cash < 0){
       if(hasLiquidatable()){
@@ -1097,7 +1162,10 @@ function renderHeader(){
 
   const cashEl = $('sCash');
   cashEl.textContent = money(state.cash);
-  cashEl.className = state.cash < 0 ? 'down' : '';
+  
+  // 不直接使用 className= ，避免覆盖正在进行的动画类名
+  cashEl.classList.remove('down', 'up');
+  if(state.cash < 0) cashEl.classList.add('down');
 
   const flowEl = $('sFlow');
   flowEl.textContent = (flow.net >= 0 ? '+' : '') + money(flow.net);
@@ -1229,7 +1297,6 @@ function renderAssets(){
   const flow = dailyNetFlow();
   $('dailyCostTxt').textContent = '-¥' + flow.cost;
 
-  /* 车 */
   const carDesc = $('carDesc');
   const carBtn  = $('btnCar');
   if(state.carSold){
@@ -1244,7 +1311,6 @@ function renderAssets(){
     carBtn.disabled = state.ended;
   }
 
-  /* 房 */
   const houseDesc = $('houseDesc');
   const houseBtn  = $('btnHouse');
   if(state.houseSold){
